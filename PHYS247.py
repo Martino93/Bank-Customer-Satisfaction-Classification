@@ -63,7 +63,7 @@ class DataProcessor():
         #Percentage of satified customers
         counts = self.df_clean['TARGET'].value_counts()
         satisfied_percentage = counts.loc[0]/len(self.df_clean) * 100
-        print("The given dataset is larger skewed towards satified customers showing a", satisfied_percentage,"percent observation")   
+        print(f"The given dataset is larger skewed towards satified customers showing a {satisfied_percentage:.2f} % observation")   
 
         self.drop_columns()
         
@@ -103,14 +103,18 @@ class DataProcessor():
         return [col for col in self.df_train.columns if col not in other]
 
 
-    def partition_data(self):
-        target_train = self.df_train['TARGET'].values
-        features_train = self.df_train.drop(columns=['ID', 'TARGET']).values
+    def partition_data(self, X=None, Y=None):
+        if X is None and Y is None:
+            target = self.df_train['TARGET'].values
+            features = self.df_train.drop(columns=['ID', 'TARGET']).values
+        else:
+            features = X
+            target = Y
 
         # split the train data since the test dataset is missing the target column
         self.X_train, self.X_test, self.Y_train, self.Y_test = train_test_split(
-            features_train,
-            target_train,
+            features,
+            target,
             test_size=0.2,
             shuffle=True,
             random_state=42
@@ -207,15 +211,14 @@ class DataVisualizer():
         plt.tight_layout()
         plt.show()
 
-
+    def feature_importance(df):
+        pass
 
 class FeatureSelector():
-    def __init__(self, X_df, Y_df):
-        self.X_df = X_df
-        self.Y_df = Y_df
+    def __init__(self, X, Y):
         self.selected_features_df = pd.DataFrame()
-        
-        self.X_new = pd.DataFrame()
+        self.X = X
+        self.Y = Y
                 
     
     def correlation_based_selection(self, threshold=0.9):
@@ -259,18 +262,24 @@ class FeatureSelector():
         #rfe.fit(self.X_df, self.Y_df)
         #self.X_new = rfe.transform(self.X_df)
         
-    def random_forest_selection(self):
+    def random_forest_selection(self, n):
         model = RandomForestClassifier()
-        model.fit(self.X_df, self.Y_df)
-        self.X_new = model.feature_importances_
-        self.selected_features_df = self.X_df.columns[model.get_support()]
-        
-        # Sort by importance
-        feature_importances = feature_importances.sort_values(by='importance', ascending=False)
+        model.fit(self.X, self.Y)
 
-        # Select top features
-        selected_features = feature_importances['feature'].head(10)
-        
+        importances = model.feature_importances_
+        feature_names = self.X.columns
+        indices = np.argsort(importances)[::-1]
+
+        top_indices = indices[:n]
+        top_features = feature_names[top_indices]
+        top_importances = importances[top_indices]
+
+        # Create a DataFrame for plotting
+        self.feature_importance_df = pd.DataFrame({
+            'Feature': top_features,
+            'Importance': top_importances
+        })
+   
     def lasso_selection(self):
         # Initialize the model with L1 regularization
         model = Lasso(alpha=0.1)
