@@ -25,7 +25,7 @@ import xgboost as xgb
 
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, log_loss
 
-# import plotly.express as px
+import plotly.express as px
 
 from feature_engine.selection import DropDuplicateFeatures, DropCorrelatedFeatures
 
@@ -237,7 +237,7 @@ class FeatureSelector():
         self.X_new = selector.fit_transform(self.X_df, self.Y_df)
         self.selected_features_df = self.X_df.columns[selector.get_support()]
 
- def execute_rfe(self):
+    def execute_rfe(self):
         x_train_scaled_sparse = csr_matrix(self.scaled_X_train)
         x_test_scaled_sparse = csr_matrix(self.scaled_X_test)
         model = LogisticRegression(max_iter=1000, random_state=0, solver='saga')
@@ -248,7 +248,7 @@ class FeatureSelector():
         #Acquiring selected features
         selected_features_rfe = self.df_clean.drop(columns=['ID', 'TARGET']).columns[rfe.support_]
         print("Selected features:", selected_features_rfe)
-         # Converting back to DataFrame
+            # Converting back to DataFrame
         self.x_train_rfe = pd.DataFrame(x_train_rfe.toarray(), columns=selected_features_rfe)
         self.x_test_rfe = pd.DataFrame(x_test_rfe.toarray(), columns=selected_features_rfe)
         return self.x_train_rfe, self.Y_train, self.x_test_rfe, self.Y_test
@@ -272,8 +272,6 @@ class FeatureSelector():
         selected_features = feature_importances['feature'].head(10)
         
     def lasso_selection(self):
-        
-
         # Initialize the model with L1 regularization
         model = Lasso(alpha=0.1)
 
