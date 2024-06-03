@@ -20,6 +20,7 @@ from sklearn.ensemble import RandomForestClassifier
 
 from sklearn.tree import DecisionTreeClassifier
 
+from scipy.sparse import csr_matrix
 import xgboost as xgb
 
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, log_loss
@@ -125,7 +126,7 @@ class DataProcessor():
 
         return self.scaled_X_train, self.Y_train, self.scaled_X_test, self.Y_test
         
-        
+   
 
 class DataVisualizer():
     
@@ -235,12 +236,28 @@ class FeatureSelector():
         selector = SelectKBest(score_func=f_classif, k=num_features)
         self.X_new = selector.fit_transform(self.X_df, self.Y_df)
         self.selected_features_df = self.X_df.columns[selector.get_support()]
-        
-    def recursive_feature_elimination(self):
-        model = LogisticRegression()
-        rfe = RFE(model, 10, step = 1)
-        rfe.fit(self.X_df, self.Y_df)
-        self.X_new = rfe.transform(self.X_df)
+
+ def execute_rfe(self):
+        x_train_scaled_sparse = csr_matrix(self.scaled_X_train)
+        x_test_scaled_sparse = csr_matrix(self.scaled_X_test)
+        model = LogisticRegression(max_iter=1000, random_state=0, solver='saga')
+        rfe = RFE(estimator=model, n_features_to_select=self.n_features_to_select)
+        rfe.fit(x_train_scaled_sparse, self.Y_train)
+        x_train_rfe = rfe.transform(x_train_scaled_sparse)
+        x_test_rfe = rfe.transform(x_test_scaled_sparse)
+        #Acquiring selected features
+        selected_features_rfe = self.df_clean.drop(columns=['ID', 'TARGET']).columns[rfe.support_]
+        print("Selected features:", selected_features_rfe)
+         # Converting back to DataFrame
+        self.x_train_rfe = pd.DataFrame(x_train_rfe.toarray(), columns=selected_features_rfe)
+        self.x_test_rfe = pd.DataFrame(x_test_rfe.toarray(), columns=selected_features_rfe)
+        return self.x_train_rfe, self.Y_train, self.x_test_rfe, self.Y_test
+    
+   # def recursive_feature_elimination(self):
+        #model = LogisticRegression()
+        #rfe = RFE(model, 10, step = 1)
+        #rfe.fit(self.X_df, self.Y_df)
+        #self.X_new = rfe.transform(self.X_df)
         
     def random_forest_selection(self):
         model = RandomForestClassifier()
