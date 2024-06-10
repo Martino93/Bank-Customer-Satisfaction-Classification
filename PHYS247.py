@@ -5,8 +5,9 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.feature_selection import RFE
@@ -117,6 +118,7 @@ class DataProcessor():
             target,
             test_size=0.2,
             shuffle=True,
+            stratify=target,
             random_state=42
             )
         print('Train data shape:', self.X_train.shape)
@@ -215,10 +217,10 @@ class DataVisualizer():
         pass
 
 class FeatureSelector():
-    def __init__(self, X, Y):
+    def __init__(self, X):
         self.selected_features_df = pd.DataFrame()
         self.X = X
-        self.Y = Y
+        # self.Y = Y
                 
     
     def correlation_based_selection(self, threshold=0.9):
@@ -256,13 +258,9 @@ class FeatureSelector():
         self.x_test_rfe = pd.DataFrame(x_test_rfe.toarray(), columns=selected_features_rfe)
         return self.x_train_rfe, self.Y_train, self.x_test_rfe, self.Y_test
     
-   # def recursive_feature_elimination(self):
-        #model = LogisticRegression()
-        #rfe = RFE(model, 10, step = 1)
-        #rfe.fit(self.X_df, self.Y_df)
-        #self.X_new = rfe.transform(self.X_df)
         
-    def random_forest_selection(self, n):
+    def random_forest_selection(self, n, Y):
+        self.Y = Y
         model = RandomForestClassifier()
         model.fit(self.X, self.Y)
 
@@ -295,6 +293,16 @@ class FeatureSelector():
 
         # Select non-zero coefficients
         selected_features = feature_coefficients[feature_coefficients['coefficient'] != 0]['feature']
+
+    def PCA(self, retain, X_test):
+        model = PCA(n_components=retain)
+        self.X_train_pca = model.fit_transform(self.X)
+        self.X_test_pca = model.transform(X_test)
+
+        # Check the explained variance ratio
+        self.explained_variance = model.explained_variance_ratio_
+        print(f"Explained variance by each component: {self.explained_variance}")
+        print(f"Total explained variance: {sum(self.explained_variance)}")
 
 
           
@@ -336,38 +344,102 @@ class MLModel():
         }
                
 
-    def logistic_regression(self):
+    def logistic_regression(self, grid:bool=False):
+        if grid:
+            param_grid = {
+                'C': [0.1, 1, 10],
+                'penalty': ['l1', 'l2'],
+                'solver': ['liblinear']
+            }
+            grid_search = GridSearchCV(
+                LogisticRegression(random_state=0, class_weight='balanced'), param_grid, cv=5, scoring='f1')
+            self.model = grid_search.fit(self.X_train, self.Y_train)
+            self.assess_model(model='logistic_regression_grid')
+            
+            return
+
         self.model = LogisticRegression(solver='liblinear', random_state=0)
         self.model = self.model.fit(self.X_train, self.Y_train)
         
         self.assess_model(model='logistic_regression')
         
         
-    def random_forest(self):
+    def random_forest(self, grid:bool=False):
+        if grid:
+            param_grid = {
+                'n_estimators': [100, 200],
+                'max_depth': [None, 10, 20],
+                'min_samples_split': [2, 5],
+                'min_samples_leaf': [1, 2]
+            }
+            grid_search = GridSearchCV(RandomForestClassifier(random_state=0, class_weight='balanced'), param_grid, cv=5, scoring='f1')
+            self.model = grid_search.fit(self.X_train, self.Y_train)
+            self.assess_model(model='random_forest_grid')
+            
+            return
+        
         self.model = RandomForestClassifier()
         self.model = self.model.fit(self.X_train, self.Y_train)
         
         self.assess_model(model='random_forest')      
 
-    def decision_tree(self):
+    def decision_tree(self, grid:bool=False):
+        if grid:
+            param_grid = {
+                'max_depth': [3, 6],
+                'min_samples_split': [3, 6],
+                'max_features': ['sqrt', 'log2']
+            }
+            grid_search = GridSearchCV(DecisionTreeClassifier(random_state=0, class_weight='balanced'), param_grid, cv=5, scoring='f1')
+            self.model = grid_search.fit(self.X_train, self.Y_train)
+            self.assess_model(model='decision_tree_grid')
+            
+            return
+
         self.model = DecisionTreeClassifier()
         self.model = self.model.fit(self.X_train, self.Y_train)
         
         self.assess_model(model='decision_tree')
         
-    def xgboost(self):
+    def xgboost(self, grid:bool=False):
+        if grid:
+            param_grid = {
+                'n_estimators': [100, 200],
+                'learning_rate': [0.01, 0.1, 0.2],
+                'max_depth': [3, 6, 10],
+                'subsample': [0.8, 1.0]
+            }
+            grid_search = GridSearchCV(xgb.XGBClassifier(random_state=0, scale_pos_weight=(len(self.Y_train) - sum(self.Y_train)) / sum(self.Y_train)), param_grid, cv=5, scoring='f1')
+            self.model = grid_search.fit(self.X_train, self.Y_train)
+            self.assess_model(model='xgboost_grid')
+            
+            return
+        
         self.model = xgb.XGBClassifier()
         self.model.fit(self.X_train, self.Y_train)
         
         self.assess_model(model='xgboost')
         
-    def svm(self):
+    def svm(self, grid:bool=False):
         self.model = SVC(probability=True)
         self.model.fit(self.X_train, self.Y_train)
         
         self.assess_model(model='svm')
         
-    def neural_network(self):
+    def neural_network(self, grid:bool=False):
+        if grid:
+            param_grid = {
+            'hidden_layer_sizes': [(50, 50), (100,)],
+            'activation': ['relu', 'tanh'],
+            'solver': ['adam', 'sgd'],
+            'alpha': [0.0001, 0.001]
+            }
+            grid_search = GridSearchCV(MLPClassifier(random_state=0), param_grid, cv=5, scoring='f1')
+            self.model = grid_search.fit(self.X_train, self.Y_train)
+            self.assess_model(model='neural_network_grid')
+            
+            return
+
         self.model = MLPClassifier()
         self.model.fit(self.X_train, self.Y_train)
         
@@ -375,60 +447,3 @@ class MLModel():
     
     
 
-
-
-
-
-
-
-# ---------------------
-# FEATURE SELECTION
-# Selector = FeatureSelector(scaled_X_df, Y_df)
-
-
-# correlation based selection
-# Selector.correlation_based_selection()
-# X_new = Selector.scaled_X_filtered_df
-# # univariate selection
-# X_new = Selector.univariate_selection(num_features=10)
-# # recursive feature elimination
-# X_new = Selector.recursive_feature_elimination()
-# # random forest selection
-# X_new = Selector.random_forest_selection()
-# # lasso selection
-# X_new = Selector.lasso_selection()
-
-
-
-
-
-
-# visualize the data
-# ---------------------
-
-# display correlation heatmap
-# Visualizer = DataVisualizer()
-# corr_arr = Visualizer.create_correlation_matrix()
-# Visualizer.make_heatmap(corr_arr, Processor.feature_cols())
-
-
-
-
-
-# ---------------------
-# evaluate the models
-## cross validation
-## evaluate probabilistic predictions
-
-# ---------------------
-# tune the models
-## grid search
-## random search
-## bayesian optimization
-
-# ---------------------
-# stack the models
-# use shap values to explain the model
-
-# ---------------------
-# Compare the models
