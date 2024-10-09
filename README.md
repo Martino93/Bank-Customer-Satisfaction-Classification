@@ -11,3 +11,11 @@ Some limitations of this include:
 The main file showing the surface analysis is **main.ipynb**.
 
 Most of the python code is found in PHYS247.py which has custom dependencies used in the primary analysis.
+
+### Methods Used
+- Data cleaning
+- Feature scaling
+- Dmensionality reduction
+- Model training (logistic regression, random forest, decision tree, xgboost, neural network)
+- Model evaluation
+- Hyperparameter tuning
